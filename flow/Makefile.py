@@ -1,12 +1,11 @@
 import argparse
 import glob
 import os
-import shutil
 import sys
 
 import siliconcompiler
 
-mydir = os.path.dirname(__file__)
+mydir = os.path.abspath(os.path.dirname(__file__))
 scdir = os.path.join(mydir, 'scripts', 'sc')
 sys.path.append(os.path.join(scdir, 'util'))
 import parse_config_mk
@@ -17,27 +16,12 @@ def main():
     args = vars(parser.parse_args())
 
     # Parse values out of provided "config.mk" file
-    config = parse_config_mk.parse(args['DESIGN_CONFIG'])
+    defaults = {
+        'DESIGN_NICKNAME': '$(DESIGN_NAME)',
+        'PLATFORM_DIR': os.path.join(mydir, 'platforms', '$(PLATFORM)')
+    }
+    config = parse_config_mk.parse(args['DESIGN_CONFIG'], defaults=defaults)
     design = config['DESIGN_NAME']
-
-    # Perform variable substitution where required.
-    repls = {}
-    # Set DESIGN_NICKNAME = DESIGN if not already set.
-    if not 'DESIGN_NICKNAME' in config:
-        repls['DESIGN_NICKNAME'] = design
-    # Set PLATFORM_DIR if not already set.
-    if not 'PLATFORM_DIR' in config:
-        repls['PLATFORM_DIR'] = os.path.abspath(os.path.join(mydir, 'platforms', config['PLATFORM']))
-
-    if repls:
-        # Set replacement value in os.environ so that the Makefile parser uses it.
-        for k, v in repls.items():
-            os.environ[k] = v
-        # Re-parse the Makefile
-        config = parse_config_mk.parse(args['DESIGN_CONFIG'])
-        # Update 'config' dictionary with the substitutions used to generate it.
-        for k, v in repls.items():
-            config[k] = v
 
     chip = siliconcompiler.Chip(design)
     chip.set('option', 'scpath', scdir)

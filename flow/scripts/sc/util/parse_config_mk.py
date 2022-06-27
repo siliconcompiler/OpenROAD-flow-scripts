@@ -2,14 +2,25 @@ import os
 import subprocess
 import tempfile
 
-def parse(path):
-    '''Parse env variables defined in a Makefile fragment'''
+def parse(path, defaults=None):
+    '''Parse env variables defined in a Makefile fragment.
+
+    Args:
+        path (str): Path to makefile fragment
+        defaults (dict): Mapping of variable names to default values (which
+            may include Make-style variable substitution expressions).
+    '''
+    if defaults is None:
+        defaults = {}
+
     env_before = os.environ
 
     with tempfile.TemporaryDirectory() as tempdir:
         makefile_path = os.path.join(tempdir, 'Makefile')
         with open(makefile_path, 'w') as f:
             print(f'include {path}', file=f)
+            for var, val in defaults.items():
+                print(f'export {var} ?= {val}', file=f)
             print(f'all:', file=f)
             print(f'\tprintenv', file=f)
 
