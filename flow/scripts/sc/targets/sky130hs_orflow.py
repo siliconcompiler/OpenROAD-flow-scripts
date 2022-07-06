@@ -27,42 +27,28 @@ def setup(chip):
     chip.set('option', 'target', 'sky130hs_orflow')
 
     # Load PDK, flow, and libs.
-    chip.load_pdk('sky130hs_orflow')
     chip.load_flow('orflow')
-    chip.load_lib('sky130hs_orflow')
+    chip.set('option', 'flow', 'orflow')
 
-    # Load design and platform config values.
-    chip = parse_target_config.parse(chip, platform)
-
-    # Set Chip object to use the loaded flow, pdk, lib.
+    # Set PDK/liberty values which cannot be inferred from platform config.mk
+    # (stackup, libtype, naming consistency, etc)
     process = 'skywater130'
     stackup = '5M1LI'
     libname = 'sky130hs'
     libtype = 'unit'
-    chip.set('option', 'flow', 'orflow')
     chip.set('option', 'pdk', process)
+    chip.set('asic', 'libarch', libtype)
     chip.set('asic', 'logiclib', libname)
-
-    chip.set('asic', 'delaymodel', 'nldm')
     chip.set('asic', 'stackup', stackup)
-    chip.set('asic', 'minlayer', "met1")
-    chip.set('asic', 'maxlayer', "met5")
-    chip.set('asic', 'maxfanout', 5) # TODO: fix this
-    chip.set('asic', 'maxlength', 21000)
-    chip.set('asic', 'maxslew', 1.5e-9)
-    chip.set('asic', 'maxcap', .1532e-12)
-    chip.set('asic', 'rclayer', 'clk', 'met5')
-    chip.set('asic', 'rclayer', 'data', 'met3')
-    chip.set('asic', 'hpinlayer', "met3")
-    chip.set('asic', 'vpinlayer', "met2")
-    chip.set('asic', 'density', 10)
-    chip.set('asic', 'aspectratio', 1)
-    chip.set('asic', 'coremargin', 62.56)
-    corner = 'typical'
-    chip.set('constraint', 'worst', 'libcorner', corner)
-    chip.set('constraint', 'worst', 'pexcorner', corner)
-    chip.set('constraint', 'worst', 'mode', 'func')
-    chip.add('constraint', 'worst', 'check', ['setup','hold'])
+    chip.set('asic', 'delaymodel', 'nldm')
+    foundry = 'skywater'
+    wafersize = 300
+    chip.set('pdk', process, 'foundry', foundry)
+    chip.set('pdk', process, 'stackup', stackup)
+    chip.set('pdk', process, 'wafersize', wafersize)
+
+    # Load design and platform config values.
+    chip = parse_target_config.parse(chip, platform)
 
     # Set default environment variables for the OpenROAD flow (sky130hs platform).
     platform_dir = os.path.join(openroad_dir, 'flow', 'platforms', 'sky130hs')

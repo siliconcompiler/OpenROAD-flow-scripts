@@ -27,43 +27,27 @@ def setup(chip):
     chip.set('option', 'target', 'nangate45_orflow')
 
     # Load flow graph and PDK/liberty manifest values.
-    chip.load_pdk('freepdk45_orflow')
     chip.load_flow('orflow')
-    chip.load_lib('nangate45_orflow')
+    chip.set('option', 'flow', 'orflow')
 
-    # Load design and platform config values.
-    chip = parse_target_config.parse(chip, platform)
-
-    # Set Chip object to use the loaded flow, pdk, lib.
+    # Set PDK/liberty values which cannot be inferred from platform config.mk
+    # (stackup, libtype, naming consistency, etc)
     process = 'freepdk45'
     stackup = '10M'
     libtype = '10t'
-    chip.set('option', 'flow', 'orflow')
     chip.set('option', 'pdk', process)
+    chip.set('asic', 'libarch', libtype)
     chip.set('asic', 'logiclib', platform)
-
-    # Set project-specific values
     chip.set('asic', 'stackup', stackup)
     chip.set('asic', 'delaymodel', 'nldm')
-    chip.set('asic', 'minlayer', "metal2")
-    chip.set('asic', 'maxlayer', "metal10")
-    chip.set('asic', 'maxfanout', 64)
-    chip.set('asic', 'maxlength', 1000)
-    chip.set('asic', 'maxslew', 0.2e-9)
-    chip.set('asic', 'maxcap', 0.2e-12)
-    chip.set('asic', 'rclayer', 'clk', "metal5")
-    chip.set('asic', 'rclayer', 'data',"metal3")
-    chip.set('asic', 'hpinlayer', "metal3")
-    chip.set('asic', 'vpinlayer', "metal2")
-    chip.set('asic', 'density', 10)
-    chip.set('asic', 'aspectratio', 1)
-    chip.set('asic', 'coremargin', 1.9)
-    # Set timing corners.
-    corner = 'typical'
-    chip.set('constraint','worst','libcorner', corner)
-    chip.set('constraint','worst','pexcorner', corner)
-    chip.set('constraint','worst','mode', 'func')
-    chip.set('constraint','worst','check', ['setup','hold'])
+    foundry = 'virtual'
+    wafersize = 300
+    chip.set('pdk', process, 'foundry', foundry)
+    chip.set('pdk', process, 'stackup', stackup)
+    chip.set('pdk', process, 'wafersize', wafersize)
+
+    # Load design and platform config values.
+    chip = parse_target_config.parse(chip, platform)
 
     # Set some default environment variables for the OpenROAD flow (nangate45 platform).
     platform_dir = os.path.join(openroad_dir, 'flow', 'platforms', 'nangate45')

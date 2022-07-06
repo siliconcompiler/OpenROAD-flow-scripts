@@ -1,5 +1,6 @@
 import glob
 import os
+import siliconcompiler
 import sys
 
 import parse_config_mk
@@ -66,6 +67,8 @@ def parse(chip, platform):
     for k, v in platform_config.items():
         os.environ[k] = v
     config = parse_config_mk.parse(design_cfg)
+    for k, v in repls.items():
+        config[k] = v
 
     # Convert source files to absolute paths b/c sc commands run in a different build dir.
     abs_sources = ['VERILOG_INCLUDE_DIRS', 'ADDITIONAL_LEFS', 'ADDITIONAL_LIBS',
@@ -139,12 +142,49 @@ def parse(chip, platform):
         # Set config environment values to be set during sc flow.
         for key, val in merged_config.items():
             chip.set('tool', tool, 'env', step, index, key, val.strip())
+            # TODO: Update remaining PDK/lib values from environment variables in the Chip manifest.
+            schema_repls = {
+                'PLACE_DENSITY': 'place_density',
+                'CELL_PAD_IN_SITES_GLOBAL_PLACEMENT': 'pad_global_place',
+                'CELL_PAD_IN_SITES_DETAIL_PLACEMENT': 'pad_detail_place',
+                'MACRO_PLACE_HALO': 'macro_place_halo',
+                'MACRO_PLACE_CHANNEL': 'macro_place_channel',
+            }
+            if key in schema_repls.keys():
+                chip.set('tool', tool, 'var', step, index, schema_repls[key], val)
 
     # Debug: print final environment variables.
     chip.logger.debug(merged_config)
 
-    # TODO: Update PDK/lib values from environment variables in the Chip manifest.
+    # TODO: Update remaining PDK/lib values from environment variables in the Chip manifest.
+    chip.set('option', 'mode', 'asic')
     chip.set('design', merged_config['DESIGN_NAME'])
+    stackup = chip.get('asic', 'stackup')
+    libtype = chip.get('asic', 'libarch')
+    process = chip.get('option', 'pdk')
 
+    # Read minimal PDK values into sc manifest.
+    chip.set('pdk', process, 'node', merged_config['PROCESS'])
+    for tool in ('openroad', 'klayout'):
+        chip.add('pdk', process, 'aprtech', tool, stackup, libtype, 'lef',
+                 os.path.abspath(merged_config['TECH_LEF']))
+    chip.set('pdk', process, 'layermap', 'klayout', 'def', 'gds', stackup,
+             os.path.abspath(merged_config['KLAYOUT_TECH_FILE']))
+    # TODO: Assuming that .lyp file prefix matches .lyt
+    chip.set('pdk', process, 'display', 'klayout', stackup,
+             os.path.abspath(f'{merged_config["KLAYOUT_TECH_FILE"][:-1]}p'))
+
+    # Read minimal liberty values into sc manifest.
+    plib_name = chip.get('asic', 'logiclib')[0]
+    platform_lib = siliconcompiler.Chip(plib_name)
+    platform_lib.set('asic', 'libarch', libtype)
+    platform_lib.set('asic', 'footprint', merged_config['PLACE_SITE'], 'symmetry', 'Y')
+    platform_lib.add('model', 'layout', 'lef', stackup, os.path.abspath(merged_config['SC_LEF']))
+    for lf in merged_config['GDS_FILES'].split():
+        platform_lib.add('model', 'layout', 'gds', stackup, os.path.abspath(lf))
+    for lf in merged_config['LIB_FILES'].split():
+        platform_lib.add('model', 'timing', 'nldm', merged_config['CORNER'],
+                         os.path.abspath(lf))
+    chip.import_library(platform_lib)
 
     return chip
